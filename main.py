@@ -4,7 +4,22 @@ from models.library import Library
 from models.book import Book
 from db_connection import Connection
 from colorama import Fore, init
+from loguru import logger
 init(autoreset=True)
+
+# Console output stays reserved for the user; diagnostics go to a file so the
+# CLI is unchanged to look at but its behaviour is now observable after the
+# fact. CR-01 was a silent data-corruption defect, and the operand logging
+# below is what would have surfaced it without a debugger.
+logger.remove()
+logger.add(
+    "library_manager.log",
+    rotation="1 MB",
+    retention=3,
+    level="DEBUG",
+    encoding="utf-8",
+    format="{time:YYYY-MM-DD HH:mm:ss} | {level: <7} | {function}:{line} | {message}",
+)
 
 
 def show_help(commands):
@@ -58,6 +73,8 @@ def main():
             # every stored title and author.
             raw = input("\nEnter command (or 'help' for options): ").strip()
             command = raw.lower()
+            logger.debug("input received | raw={!r} | dispatch_key={!r}",
+                         raw, command)
 
             if command.startswith("add "):
                 args = raw[4:].strip()
@@ -70,6 +87,11 @@ def main():
                         try:
                             year = int(year_str)
                             if 1800 <= year <= 2025:
+                                # Logged before persistence: if operand case is
+                                # ever destroyed again, it is visible here.
+                                logger.info(
+                                    "add parsed | title={!r} author={!r} year={}",
+                                    title, author, year)
                                 b = Book(title, author, year)
                                 lib.add_book(b)
                                 print(Fore.GREEN + f"Added: {title}")
