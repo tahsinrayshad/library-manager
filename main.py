@@ -52,10 +52,15 @@ def main():
 
     try:
         while True:
-            command = input("\nEnter command (or 'help' for options): ").strip().lower()
+            # `raw` preserves the user's capitalisation and is the only source
+            # for operands; `command` is the case-folded copy used purely for
+            # dispatch. Folding the whole line, as this once did, corrupted
+            # every stored title and author.
+            raw = input("\nEnter command (or 'help' for options): ").strip()
+            command = raw.lower()
 
             if command.startswith("add "):
-                args = command[4:].strip()
+                args = raw[4:].strip()
                 try:
                     import shlex
                     parts = shlex.split(args)
@@ -88,21 +93,21 @@ def main():
                 lib.stats_book()
 
             elif command.startswith("edit "):
-                edit_term = command[5:]
+                edit_term = raw[5:]
                 if edit_term:
                     lib.edit_book(edit_term)
                 else:
                     print(Fore.RED + "Usage: edit <term>")
 
             elif command.startswith("search "):
-                search_term = command[7:]
+                search_term = raw[7:]
                 if search_term:
                     lib.search_book(search_term)
                 else:
                     print(Fore.RED + "Usage: search <term>")
 
             elif command.startswith("remove "):
-                remove_term = command[7:]
+                remove_term = raw[7:]
                 if remove_term:
                     lib.remove_book(remove_term)
                 else:
