@@ -24,17 +24,11 @@ class Book:
         return cls(data["title"], data["author"], data["year"])
     
     def save_to_db(self):
-        conn = Connection.get_connection()
-        if not conn:
-            return False
+        query = "INSERT INTO books (title, author, year) VALUES (?, ?, ?)"
         try:
-            cursor = conn.cursor()
-            query = "INSERT INTO books (title, author, year) VALUES (?, ?, ?)"
-            cursor.execute(query, (self.title, self.author, self.year))
-            conn.commit()
+            with Connection.cursor(commit=True) as cur:
+                cur.execute(query, (self.title, self.author, self.year))
             return True
         except Exception as e:
             print(f"Error saving to DB: {e}")
             return False
-        finally:
-            conn.close()

@@ -6,6 +6,21 @@ init(autoreset=True)
 
 class Library:
 
+    # The column being updated cannot be interpolated from user input: each
+    # editable field maps to a complete, fixed statement. The previous code
+    # built the column name with an f-string, which was safe only because the
+    # surrounding prompt loop happened to constrain the value. That guarantee
+    # lived in the wrong place -- one refactor away from becoming an injection.
+    _UPDATE_QUERIES = {
+        "title": "UPDATE books SET title = ? "
+                 "WHERE title = ? AND author = ? AND year = ?",
+        "author": "UPDATE books SET author = ? "
+                  "WHERE title = ? AND author = ? AND year = ?",
+        "year": "UPDATE books SET year = ? "
+                "WHERE title = ? AND author = ? AND year = ?",
+    }
+    EDITABLE_FIELDS = tuple(_UPDATE_QUERIES)
+
     def __init__(self):
         self.books = []
         self.load_from_db()
@@ -46,24 +61,17 @@ class Library:
                 check = input(Fore.RED + f"Are you sure you want to remove '{name_book}'? (Y/N): ").strip().lower()
                 
                 if check == 'y':
-                    conn = Connection.get_connection()
-                    if conn:
-                        try:
-                            cursor = conn.cursor()
-                            query = "DELETE FROM books WHERE title = ? AND author = ? AND year = ?"
-                            values = (book.title, book.author, book.year)
-                            cursor.execute(query, values)
-                            conn.commit()
-                            
-                            self.books.remove(book)
-                            print(Fore.GREEN + f"'{name_book}' removed successfully!")
-                            
-                        except Exception as e:
-                            print(f"Error deleting from DB: {e}")
-                        finally:
-                            conn.close()
-                    else:
-                        print(Fore.RED + "Could not connect to database!")
+                    query = "DELETE FROM books WHERE title = ? AND author = ? AND year = ?"
+                    values = (book.title, book.author, book.year)
+                    try:
+                        with Connection.cursor(commit=True) as cur:
+                            cur.execute(query, values)
+
+                        self.books.remove(book)
+                        print(Fore.GREEN + f"'{name_book}' removed successfully!")
+
+                    except Exception as e:
+                        print(f"Error deleting from DB: {e}")
                 else:
                     print(Fore.RED + 'Remove operation canceled.')
                 return
@@ -91,7 +99,7 @@ class Library:
             if name_book.lower() == book.title.lower():
                 while True:
                     check = input(f"What do you want to change in '{name_book}'? (title/author/year): ").strip().lower()
-                    if check in ['title', 'author', 'year']:
+                    if check in self.EDITABLE_FIELDS:
                         break
                     print(Fore.RED + "Please select: title, author, or year")
 
@@ -106,24 +114,23 @@ class Library:
                     print(Fore.RED + "No changes made - same value entered.")
                     return
 
-                # Update database
-                conn = Connection.get_connection()
-                if conn:
-                    try:
-                        cursor = conn.cursor()
-                        query = f"UPDATE books SET {check} = ? WHERE title = ? AND author = ? AND year = ?"
-                        values = (new_value, book.title, book.author, book.year)
-                        cursor.execute(query, values)
-                        conn.commit()
-                        
-                        setattr(book, check, new_value)
-                        print(Fore.GREEN + f"Book updated successfully!\nNew details: {book}")
-                        
-                    except Exception as e:
-                        print(f"Error updating database: {e}")
-                    finally:
-                        cursor.close()
-                        conn.close()
+                query = self._UPDATE_QUERIES.get(check)
+                if query is None:
+                    # Unreachable while the prompt loop guards `check`, but the
+                    # safety of the SQL no longer depends on that loop.
+                    print(Fore.RED + f"Refusing to update unknown field '{check}'.")
+                    return
+
+                values = (new_value, book.title, book.author, book.year)
+                try:
+                    with Connection.cursor(commit=True) as cur:
+                        cur.execute(query, values)
+
+                    setattr(book, check, new_value)
+                    print(Fore.GREEN + f"Book updated successfully!\nNew details: {book}")
+
+                except Exception as e:
+                    print(f"Error updating database: {e}")
                 return
         
         print(Fore.RED + f"Book '{name_book}' not found.")
@@ -142,27 +149,20 @@ class Library:
         print(Fore.CYAN + f"Newest book: '{newest.title}' by {newest.author} ({newest.year})")
 
     def load_from_db(self):
-        conn = Connection.get_connection()
-        if conn:
-            try:
-                cursor = conn.cursor()
-                cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='books'")
-                if cursor.fetchone():
-                    cursor.execute("SELECT title, author, year FROM books")
-                    results = cursor.fetchall()
-                    self.books = []
-                    for row in results:
-                        book = Book(row[0], row[1], row[2])
-                        self.books.append(book)
+        try:
+            with Connection.cursor() as cur:
+                cur.execute(
+                    "SELECT name FROM sqlite_master "
+                    "WHERE type='table' AND name='books'"
+                )
+                if cur.fetchone():
+                    cur.execute("SELECT title, author, year FROM books")
+                    results = cur.fetchall()
+                    self.books = [Book(r[0], r[1], r[2]) for r in results]
                     print(Fore.BLUE + f"Loaded {len(self.books)} books from database.")
                 else:
                     self.books = []
                     print("Books table not found. Starting with empty library.")
-            except Exception as e:
-                print(f"Error loading from database: {e}")
-                self.books = []
-            finally:
-                conn.close()
-        else:
-            print("Could not connect to database.")
+        except Exception as e:
+            print(f"Error loading from database: {e}")
             self.books = []

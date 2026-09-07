@@ -1,0 +1,9 @@
+# Runtime dependencies for library-manager.
+#
+# colorama was previously undeclared: readme.md instructs the user to install
+# python-dotenv, but every module imports colorama and nothing imported dotenv.
+colorama==0.4.6
+loguru==0.7.3
+
+# Development / test only.
+pytest==9.1.1

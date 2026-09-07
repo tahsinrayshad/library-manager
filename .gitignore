@@ -2,5 +2,10 @@ __pycache__/
 *.pyc
 .env
 venv/
+.venv/
 *.db
 *.txt
+# `*.txt` is broad enough to swallow the dependency manifest; keep it tracked.
+!requirements.txt
+library_manager.log
+.pytest_cache/
