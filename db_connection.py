@@ -1,10 +1,46 @@
+import os
 import sqlite3
+from pathlib import Path
+
+from dotenv import load_dotenv
 from colorama import Fore, init
+
 init(autoreset=True)
 
+# The database used to be named by the bare relative string "library.db",
+# which sqlite3 resolves against the process working directory rather than the
+# project. Launching the application from anywhere other than the repository
+# root therefore created a second, empty database instead of opening the real
+# one. Anchoring to this module's own location makes the location stable no
+# matter where the program is started from.
+PROJECT_ROOT = Path(__file__).resolve().parent
+
+# .env is optional. When it is absent, or the variable is unset, the defaults
+# below apply and behaviour matches the historical layout.
+load_dotenv(PROJECT_ROOT / ".env")
+
+DEFAULT_DB_NAME = "library.db"
+DB_PATH_ENV_VAR = "LIBRARY_DB_PATH"
+
+
+def resolve_db_path():
+    """Absolute path of the SQLite file, honouring LIBRARY_DB_PATH.
+
+    A relative value is interpreted against the project root, not the working
+    directory. An absolute value is used as given, so a deployment can place
+    the database outside the source tree.
+    """
+    configured = os.getenv(DB_PATH_ENV_VAR, "").strip() or DEFAULT_DB_NAME
+    path = Path(configured).expanduser()
+    if not path.is_absolute():
+        path = PROJECT_ROOT / path
+    path.parent.mkdir(parents=True, exist_ok=True)
+    return str(path)
+
+
 class Connection:
-    DB_NAME = "library.db"
-    
+    DB_NAME = resolve_db_path()
+
     @staticmethod
     def get_connection():
         try:

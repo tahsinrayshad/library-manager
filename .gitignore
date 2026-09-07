@@ -2,5 +2,9 @@ __pycache__/
 *.pyc
 .env
 venv/
+.venv/
 *.db
 *.txt
+# `*.txt` above is broad enough to swallow the standard Python dependency
+# manifest, which is why this project had none. Keep the manifest tracked.
+!requirements.txt
