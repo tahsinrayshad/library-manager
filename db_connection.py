@@ -4,8 +4,21 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 from colorama import Fore, init
+from loguru import logger
 
 init(autoreset=True)
+
+# CR-02 was invisible at runtime: nothing reported which file was actually
+# opened, so using the wrong database looked identical to using an empty one.
+logger.remove()
+logger.add(
+    "library_manager.log",
+    rotation="1 MB",
+    retention=3,
+    level="DEBUG",
+    encoding="utf-8",
+    format="{time:YYYY-MM-DD HH:mm:ss} | {level: <7} | {function}:{line} | {message}",
+)
 
 # The database used to be named by the bare relative string "library.db",
 # which sqlite3 resolves against the process working directory rather than the
@@ -35,6 +48,12 @@ def resolve_db_path():
     if not path.is_absolute():
         path = PROJECT_ROOT / path
     path.parent.mkdir(parents=True, exist_ok=True)
+    logger.debug(
+        "database path resolved | source={} | configured={!r} | resolved={}",
+        "env" if os.getenv(DB_PATH_ENV_VAR) else "default",
+        configured,
+        path,
+    )
     return str(path)
 
 
