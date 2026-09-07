@@ -42,6 +42,18 @@ class Library:
         """The book with this exact title, case-insensitively, or None."""
         return self._by_title.get(title.strip().lower())
 
+    def _require_book(self, name_book):
+        """`find_by_title`, reporting the miss to the user.
+
+        Extracted because remove_book and edit_book opened with an identical
+        lookup-and-complain preamble once both were flattened; jscpd reported
+        the pair as a clone.
+        """
+        book = self.find_by_title(name_book)
+        if book is None:
+            print(Fore.RED + f"Book '{name_book}' not found.")
+        return book
+
 
 
     def add_book(self, book):
@@ -75,9 +87,8 @@ class Library:
 
 
     def remove_book(self, name_book):
-        book = self.find_by_title(name_book)
+        book = self._require_book(name_book)
         if book is None:
-            print(Fore.RED + f"Book '{name_book}' not found.")
             return
 
         check = input(Fore.RED + f"Are you sure you want to remove '{name_book}'? (Y/N): ").strip().lower()
@@ -133,9 +144,8 @@ class Library:
 
 
     def edit_book(self, name_book):
-        book = self.find_by_title(name_book)
+        book = self._require_book(name_book)
         if book is None:
-            print(Fore.RED + f"Book '{name_book}' not found.")
             return
 
         while True:
